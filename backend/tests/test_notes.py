@@ -1,0 +1,7 @@
+"""TODO: implement test_notes once the corresponding backend feature lands."""
+import pytest
+
+
+@pytest.mark.skip(reason="not implemented yet")
+def test_placeholder():
+    pass
