@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg2://keep_user:keep_password@localhost:5432/keep_db"
+    database_url: str = "postgresql+psycopg://keep_user:keep_password@localhost:5432/keep_db"
 
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
