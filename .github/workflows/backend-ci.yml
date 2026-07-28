@@ -60,7 +60,7 @@ jobs:
       - name: Run tests
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/keep_test
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/keep_test 
           JWT_SECRET: test-secret-key
           OPENAI_API_KEY: sk-test-placeholder
         run: pytest -v
