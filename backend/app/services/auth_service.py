@@ -1,8 +1,29 @@
-"""bcrypt password hashing + JWT create/verify.
+"""Password hashing (bcrypt) and JWT create/verify."""
+import uuid
+from datetime import datetime, timedelta, timezone
 
-TODO(backend-auth-notes): implement hash_password, verify_password,
-create_access_token, decode_access_token.
+import jwt
+from passlib.context import CryptContext
 
-JWT-in-httpOnly-cookie note.
-token creation stays basically the same (still a signed JWT), but now you also need a helper to set/clear the cookie.
-"""
+from app.config import settings
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(user_id: uuid.UUID) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    payload = {"sub": str(user_id), "exp": expire}
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_access_token(token: str) -> dict:
+    """Raises jwt.PyJWTError (or a subclass) on invalid/expired tokens."""
+    return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
