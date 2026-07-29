@@ -3,17 +3,18 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool   # add this import
 
 from app.database import Base, get_db
 from app.main import app
 
-TEST_DATABASE_URL = "postgresql+psycopg://keep_user:keep_password@localhost:5432/keep_db"
+TEST_DATABASE_URL = "sqlite:///:memory:"
 
 
 @pytest.fixture()
 def db_session():
     engine = create_engine(
-        TEST_DATABASE_URL, connect_args={"check_same_thread": False}
+        TEST_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -34,7 +35,7 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    with TestClient(app, base_url="https://testserver") as c:
         yield c
     app.dependency_overrides.clear()
 
