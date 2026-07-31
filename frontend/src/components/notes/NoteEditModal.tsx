@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Note } from "../../types";
 import { NOTE_COLOR_KEYS, NOTE_COLORS } from "./noteColors";
 import RichTextEditor from "./RichTextEditor";
@@ -11,17 +11,16 @@ interface NoteEditModalProps {
   onDelete: (note: Note) => void;
 }
 
+/**
+ * The parent must render this with `key={note.id}` (see Dashboard.tsx) so
+ * that switching notes remounts a fresh instance instead of needing an
+ * effect to sync props into state on every note change.
+ */
 export default function NoteEditModal({ note, onClose, onSave, onDelete }: NoteEditModalProps) {
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState<JSONContent>(note.content as JSONContent);
   const [color, setColor] = useState(note.color);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setTitle(note.title);
-    setContent(note.content as JSONContent);
-    setColor(note.color);
-  }, [note]);
 
   async function handleClose() {
     setSaving(true);

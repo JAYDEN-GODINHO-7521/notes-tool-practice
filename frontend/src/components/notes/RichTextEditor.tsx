@@ -45,7 +45,6 @@ export default function RichTextEditor({
     if (editor && content && JSON.stringify(editor.getJSON()) !== JSON.stringify(content)) {
       editor.commands.setContent(content, false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, content]);
 
   if (!editor) return null;

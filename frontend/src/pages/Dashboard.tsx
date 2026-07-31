@@ -92,6 +92,7 @@ export default function Dashboard() {
 
       {openNote && (
         <NoteEditModal
+          key={openNote.id}
           note={openNote}
           onClose={() => setOpenNote(null)}
           onSave={handleSave}
