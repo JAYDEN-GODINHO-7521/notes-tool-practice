@@ -18,8 +18,15 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Cookie missing/expired/invalid — nothing to clear client-side.
+    const isAuthCheck = error.config?.url?.includes("/api/auth/me");
+    const onAuthPage =
+      window.location.pathname === "/login" || window.location.pathname === "/register";
+
+    // Don't hard-redirect for the background "am I logged in?" check that
+    // AuthProvider runs on every page load — a 401 there is expected for
+    // anonymous visitors and is already handled by useAuth/ProtectedRoute.
+    // Redirecting here too caused an infinite reload loop on /login.
+    if (error.response?.status === 401 && !isAuthCheck && !onAuthPage) {
       window.location.href = "/login";
     }
     return Promise.reject(error);
