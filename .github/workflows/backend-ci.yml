@@ -62,5 +62,5 @@ jobs:
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/keep_test 
           JWT_SECRET: test-secret-key
-          OPENAI_API_KEY: sk-test-placeholder
+          GOOGLE_API_KEY: used-in-tests
         run: pytest -v
