@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool   # add this import
+from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
@@ -14,7 +14,9 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 @pytest.fixture()
 def db_session():
     engine = create_engine(
-        TEST_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool
+        TEST_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -42,8 +44,14 @@ def client(db_session):
 
 @pytest.fixture()
 def mock_llm(monkeypatch):
-    """Patch app.services.llm_service calls with canned responses.
+    """Patch app.services.llm_service.stream_completion with a canned,
+    deterministic async generator so tests never call the real OpenAI API."""
 
-    TODO(backend-llm): flesh out once llm_service has real functions to mock.
-    """
-    return None
+    async def fake_stream_completion(system: str, user_prompt: str):
+        for chunk in ["Mocked ", "response ", "text."]:
+            yield chunk
+
+    monkeypatch.setattr(
+        "app.services.llm_service.stream_completion", fake_stream_completion
+    )
+    return fake_stream_completion

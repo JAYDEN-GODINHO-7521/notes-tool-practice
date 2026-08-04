@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
-    openai_api_key: str = ""
+    google_api_key: str 
 
     env: str = "development"
     cors_origins: str = "http://localhost:5173"
