@@ -30,7 +30,7 @@ def _get_client() -> AsyncOpenAI:
 async def stream_completion(system: str, user_prompt: str) -> AsyncGenerator[str, None]:
     """Yields text deltas from a streaming chat completion."""
     stream = await _get_client().chat.completions.create(
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash-lite",
         stream=True,
         messages=[
             {"role": "system", "content": system},
@@ -41,3 +41,22 @@ async def stream_completion(system: str, user_prompt: str) -> AsyncGenerator[str
         delta = chunk.choices[0].delta.content
         if delta:
             yield delta
+
+
+async def generate_json(system: str, user_prompt: str) -> str:
+    """Non-streaming completion that returns the full response text.
+
+    Used where the caller needs a complete, parseable response (e.g.
+    flashcard generation returns a JSON array) rather than incremental
+    deltas for live display.
+    """
+    response = await _get_client().chat.completions.create(
+        model="gemini-3.5-flash-lite",
+        stream=False,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return response.choices[0].message.content or ""

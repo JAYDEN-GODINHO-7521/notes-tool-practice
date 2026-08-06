@@ -1,6 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import { useState } from "react";
 import type { Note } from "../../types";
+import GenerateFlashcardsButton from "./GenerateFlashcardsButton";
 import { NOTE_COLOR_KEYS, NOTE_COLORS } from "./noteColors";
 import RichTextEditor from "./RichTextEditor";
 
@@ -86,6 +87,8 @@ export default function NoteEditModal({ note, onClose, onSave, onDelete }: NoteE
             </button>
           </div>
         </div>
+
+        <GenerateFlashcardsButton noteId={note.id} />
       </div>
     </div>
   );

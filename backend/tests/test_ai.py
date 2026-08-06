@@ -1,5 +1,5 @@
 """AI generate endpoint tests: auth, action validation, streamed output
-(mocked OpenAI via the mock_llm fixture)."""
+(mocked OpenAI-compatible API via the mock_llm fixture)."""
 import json
 
 
@@ -26,9 +26,18 @@ def test_generate_requires_auth(client):
     assert resp.status_code == 401
 
 
-def test_generate_translate_requires_target_language(client, mock_llm):
+def test_generate_custom_requires_instruction(client, mock_llm):
     _register(client)
-    resp = client.post("/api/ai/generate", json={"action": "translate", "text": "hello"})
+    resp = client.post("/api/ai/generate", json={"action": "custom", "text": "hello"})
+    assert resp.status_code == 400
+
+
+def test_generate_custom_rejects_overlong_instruction(client, mock_llm):
+    _register(client)
+    resp = client.post(
+        "/api/ai/generate",
+        json={"action": "custom", "text": "hello", "instruction": "x" * 600},
+    )
     assert resp.status_code == 400
 
 
@@ -49,21 +58,24 @@ def test_generate_streams_paraphrase(client, mock_llm):
         assert _collect_deltas(resp) == "Mocked response text."
 
 
-def test_generate_streams_translate(client, mock_llm):
+def test_generate_streams_custom(client, mock_llm):
     _register(client)
     with client.stream(
         "POST",
         "/api/ai/generate",
-        json={"action": "translate", "text": "Hello", "target_language": "Spanish"},
+        json={
+            "action": "custom",
+            "text": "The mitochondria is the powerhouse of the cell.",
+            "instruction": "Turn this into a rhyming couplet",
+        },
     ) as resp:
         assert resp.status_code == 200
         assert _collect_deltas(resp) == "Mocked response text."
 
 
-def test_generate_streams_expand(client, mock_llm):
+def test_generate_rejects_unknown_action(client, mock_llm):
     _register(client)
-    with client.stream(
-        "POST", "/api/ai/generate", json={"action": "expand", "text": "Entropy"}
-    ) as resp:
-        assert resp.status_code == 200
-        assert _collect_deltas(resp) == "Mocked response text."
+    resp = client.post(
+        "/api/ai/generate", json={"action": "translate", "text": "hello"}
+    )
+    assert resp.status_code == 422  # no longer a valid action per the Literal type

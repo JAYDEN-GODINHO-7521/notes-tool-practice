@@ -28,7 +28,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(notes.router, prefix="/api/notes", tags=["notes"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
-app.include_router(flashcards.router, prefix="/api/flashcards", tags=["flashcards"])
+app.include_router(flashcards.router, prefix="/api", tags=["flashcards"])
 app.include_router(study.router, prefix="/api/study", tags=["study"])
 
 

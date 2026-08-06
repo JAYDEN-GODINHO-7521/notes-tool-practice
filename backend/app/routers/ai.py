@@ -1,5 +1,5 @@
 """AI router: POST /api/ai/generate — SSE stream for selection actions
-(paraphrase, translate, expand). Auth via the same cookie as every other
+(paraphrase, custom request). Auth via the same cookie as every other
 route (no EventSource here since this is a POST with a body; the frontend
 uses a fetch-based streaming reader instead — see api/ai.ts)."""
 import json
@@ -16,12 +16,13 @@ from app.services import llm_service, prompts
 router = APIRouter()
 
 MAX_SELECTION_LENGTH = 4000  # characters; guards against pathological requests
+MAX_INSTRUCTION_LENGTH = 500
 
 
 class GenerateRequest(BaseModel):
-    action: Literal["paraphrase", "translate", "expand"]
+    action: Literal["paraphrase", "custom"]
     text: str
-    target_language: str | None = None
+    instruction: str | None = None  # required when action == "custom"
 
 
 def _build_prompt(payload: GenerateRequest) -> tuple[str, str]:
@@ -33,15 +34,19 @@ def _build_prompt(payload: GenerateRequest) -> tuple[str, str]:
 
     if payload.action == "paraphrase":
         return prompts.paraphrase_prompt(payload.text)
-    if payload.action == "expand":
-        return prompts.expand_prompt(payload.text)
-    # action == "translate"
-    if not payload.target_language:
+
+    # action == "custom"
+    if not payload.instruction or not payload.instruction.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="target_language is required for the translate action",
+            detail="instruction is required for the custom action",
         )
-    return prompts.translate_prompt(payload.text, payload.target_language)
+    if len(payload.instruction) > MAX_INSTRUCTION_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Instruction too long (max {MAX_INSTRUCTION_LENGTH} characters)",
+        )
+    return prompts.custom_request_prompt(payload.text, payload.instruction)
 
 
 @router.post("/generate")

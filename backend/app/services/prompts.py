@@ -1,8 +1,8 @@
-"""Prompt templates for selection-based actions (paraphrase/translate/expand).
-
-Each function returns (system_prompt, user_prompt). All prompts instruct the
-model to preserve LaTeX delimiters ($...$ inline, $$...$$ block) verbatim,
-since selected text may contain math from a note.
+"""Prompt templates for selection-based actions (paraphrase/custom request)
+and flashcard generation. Each action function returns (system_prompt,
+user_prompt). All prompts instruct the model to preserve LaTeX delimiters
+($...$ inline, $$...$$ block) verbatim, since selected text may contain
+math from a note.
 """
 
 _LATEX_INSTRUCTION = (
@@ -13,28 +13,51 @@ _LATEX_INSTRUCTION = (
 
 def paraphrase_prompt(text: str) -> tuple[str, str]:
     system = (
-        "You paraphrase text the user has selected in their notes app. "
-        "Keep the same meaning and roughly the same length. "
+        "You paraphrase and simplify text the user has selected in their "
+        "notes app. Keep the same meaning, but favor clearer wording and "
+        "shorter sentences where that makes the passage easier to understand "
+        "— don't just restate it more complexly. "
         "Return only the paraphrased text, no preamble or explanation. "
         f"{_LATEX_INSTRUCTION}"
     )
     return system, text
 
 
-def translate_prompt(text: str, target_language: str) -> tuple[str, str]:
+def custom_request_prompt(text: str, instruction: str) -> tuple[str, str]:
     system = (
-        f"You translate text the user has selected in their notes app into {target_language}. "
-        "Return only the translated text, no preamble or explanation. "
+        "The user has selected text in their notes app and given you a "
+        "custom instruction for what to do with it. Follow the instruction "
+        "and return only the resulting text, no preamble or explanation "
+        "of what you did. "
         f"{_LATEX_INSTRUCTION}"
     )
-    return system, text
+    user_prompt = f"Instruction: {instruction}\n\nSelected text:\n{text}"
+    return system, user_prompt
 
 
-def expand_prompt(text: str) -> tuple[str, str]:
+def flashcard_generation_prompt(
+    title: str, content_text: str, highlighted_text: list[str] | None = None
+) -> tuple[str, str]:
     system = (
-        "You briefly explain a passage the user has selected in their notes, "
-        "as if helping them understand a concept they're studying. "
-        "2-4 sentences. Do not just restate the passage. "
-        f"{_LATEX_INSTRUCTION}"
+        "You generate spaced-repetition flashcards from a user's note. "
+        "Create 3-8 cards covering the key facts/concepts, using a mix of "
+        "question styles (definition, cloze/fill-in-the-blank, application). "
+        f"{_LATEX_INSTRUCTION} "
+        'Respond with ONLY a JSON object of the exact shape: '
+        '{"cards": [{"front": string, "back": string, '
+        '"variants": [string, string]}]} '
+        "— variants are 1-2 alternate phrasings of the front question. "
+        "No prose, no markdown code fences, just the JSON object."
     )
-    return system, text
+
+    user_prompt = f"Note title: {title}\n\nNote content:\n{content_text}"
+
+    if highlighted_text:
+        highlighted_block = "\n".join(f"- {h}" for h in highlighted_text)
+        user_prompt += (
+            "\n\nThe user has highlighted these passages as important — "
+            "prioritize covering them in the flashcards you generate:\n"
+            f"{highlighted_block}"
+        )
+
+    return system, user_prompt

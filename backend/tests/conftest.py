@@ -44,14 +44,25 @@ def client(db_session):
 
 @pytest.fixture()
 def mock_llm(monkeypatch):
-    """Patch app.services.llm_service.stream_completion with a canned,
-    deterministic async generator so tests never call the real OpenAI API."""
+    """Patch app.services.llm_service.stream_completion and generate_json
+    with canned, deterministic responses so tests never call the real API."""
 
     async def fake_stream_completion(system: str, user_prompt: str):
         for chunk in ["Mocked ", "response ", "text."]:
             yield chunk
 
+    async def fake_generate_json(system: str, user_prompt: str) -> str:
+        return (
+            '{"cards": ['
+            '{"front": "What is 2+2?", "back": "4", "variants": ["2 plus 2 equals?"]},'
+            '{"front": "Capital of France?", "back": "Paris", "variants": []}'
+            "]}"
+        )
+
     monkeypatch.setattr(
         "app.services.llm_service.stream_completion", fake_stream_completion
+    )
+    monkeypatch.setattr(
+        "app.services.llm_service.generate_json", fake_generate_json
     )
     return fake_stream_completion

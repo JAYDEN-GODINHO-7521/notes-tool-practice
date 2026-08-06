@@ -20,3 +20,17 @@ export type NoteCreateInput = Partial<
 >;
 
 export type NoteUpdateInput = NoteCreateInput;
+
+export interface Flashcard {
+  id: string;
+  note_id: string;
+  front: string;
+  back: string;
+  front_variants: string[];
+  variant_index: number;
+  state: number;
+  due: string;
+  reps: number;
+  lapses: number;
+  created_at: string;
+}
