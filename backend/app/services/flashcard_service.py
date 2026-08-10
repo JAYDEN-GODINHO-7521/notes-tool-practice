@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.flashcard import Flashcard
 from app.models.note import Note
 from app.services import llm_service, prompts
-from app.services.fsrs_service import new_fsrs_card, state_to_int
+from app.services.fsrs_service import ensure_aware, new_fsrs_card, state_to_int
 
 MAX_CARDS_PER_GENERATION = 8
 
@@ -81,7 +81,7 @@ async def generate_flashcards_for_note(note: Note, db: Session) -> list[Flashcar
             back=str(card["back"]),
             front_variants=[str(v) for v in variants if v],
             state=state_to_int(fresh.state),
-            due=fresh.due,
+            due=ensure_aware(fresh.due),
             fsrs_card_data=fresh.to_dict(),
         )
         db.add(flashcard)

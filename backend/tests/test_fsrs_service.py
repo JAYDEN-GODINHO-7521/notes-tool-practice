@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.models.flashcard import Flashcard
-from app.services.fsrs_service import new_fsrs_card, review_flashcard, state_to_int
+from app.services.fsrs_service import ensure_aware, new_fsrs_card, review_flashcard, state_to_int
 
 
 def _fresh_flashcard(db_session, user_id: uuid.UUID, note_id: uuid.UUID) -> Flashcard:
@@ -18,7 +18,7 @@ def _fresh_flashcard(db_session, user_id: uuid.UUID, note_id: uuid.UUID) -> Flas
         back="Test back",
         front_variants=[],
         state=state_to_int(card.state),
-        due=card.due,
+        due=ensure_aware(card.due),
         fsrs_card_data=card.to_dict(),
     )
     db_session.add(flashcard)
@@ -76,7 +76,10 @@ def test_due_date_is_in_the_future_after_review(client, db_session):
 
     review_flashcard(card, rating=3, db=db_session)
 
-    assert card.due >= datetime.now(timezone.utc)
+    # card.due was just read back from the DB via db.refresh() inside
+    # review_flashcard() — coerce for the same SQLite-round-trip reason as
+    # in fsrs_service.py.
+    assert ensure_aware(card.due) >= datetime.now(timezone.utc)
 
 
 def test_review_increments_reps_and_updates_state(client, db_session):

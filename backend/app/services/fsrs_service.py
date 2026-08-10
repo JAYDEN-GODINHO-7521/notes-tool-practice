@@ -48,9 +48,25 @@ def state_to_int(state: State) -> int:
     return _STATE_TO_INT.get(state, 1)  # 1 = Learning, the only sane fallback
 
 
+def _ensure_aware(dt: datetime | None) -> datetime | None:
+    """py-fsrs is documented to use UTC only, but datetimes coming back out
+    of Card.to_dict()/from_dict() round-tripping (via our JSON column) have
+    been observed to lose their tzinfo. Defensively re-attach UTC rather
+    than trust it every time — any naive datetime here is always meant to
+    be UTC per the package's own docs."""
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+# Public alias — other modules (e.g. flashcard_service.py, when creating a
+# fresh card) should use this rather than trusting fsrs's datetimes directly.
+ensure_aware = _ensure_aware
+
+
 def _sync_flashcard_from_card(flashcard: Flashcard, card: FSRSCard, now: datetime) -> None:
     flashcard.fsrs_card_data = card.to_dict()
-    flashcard.due = card.due
+    flashcard.due = _ensure_aware(card.due)
     flashcard.stability = card.stability or 0.0
     flashcard.difficulty = card.difficulty or 0.0
     flashcard.state = state_to_int(card.state)
@@ -72,12 +88,18 @@ def review_flashcard(
 
     if flashcard.fsrs_card_data:
         card = FSRSCard.from_dict(flashcard.fsrs_card_data)
+        card.due = _ensure_aware(card.due)
+        card.last_review = _ensure_aware(card.last_review)
     else:
         # Backfill path for any flashcard created before fsrs_card_data
         # existed — starts a fresh FSRS card rather than failing.
         card = new_fsrs_card()
 
-    prior_last_review = flashcard.last_review
+    # flashcard.last_review came from the DB — on SQLite (tests), a
+    # DateTime(timezone=True) column round-trips as naive after commit +
+    # refresh, since SQLite has no native tz-aware storage. Coerce
+    # defensively, same as we do for datetimes from the fsrs package.
+    prior_last_review = _ensure_aware(flashcard.last_review)
     elapsed_days = (now - prior_last_review).days if prior_last_review else 0
 
     updated_card, _review_log_entry = _scheduler.review_card(
@@ -86,8 +108,9 @@ def review_flashcard(
         review_datetime=now,
         review_duration=review_duration_ms,
     )
+    updated_due = _ensure_aware(updated_card.due)
 
-    scheduled_days = (updated_card.due - now).days if updated_card.due else 0
+    scheduled_days = (updated_due - now).days if updated_due else 0
 
     _sync_flashcard_from_card(flashcard, updated_card, now)
     flashcard.elapsed_days = max(elapsed_days, 0)
