@@ -13,7 +13,8 @@ from app.deps import get_current_user
 from app.models.flashcard import Flashcard
 from app.models.note import Note
 from app.models.user import User
-from app.schemas.flashcard import FlashcardGenerateResponse, FlashcardOut
+from app.schemas.flashcard import FlashcardGenerateResponse, FlashcardOut, ReviewRequest
+from app.services import fsrs_service
 from app.services.flashcard_service import generate_flashcards_for_note
 
 router = APIRouter()
@@ -48,6 +49,16 @@ def list_note_flashcards(
     return db.execute(stmt).scalars().all()
 
 
+@router.get("/flashcards/due", response_model=list[FlashcardOut])
+def get_due_flashcards(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Placed before /flashcards/{flashcard_id} so "due" is never matched
+    as a UUID path param."""
+    return fsrs_service.get_due_flashcards(current_user.id, db)
+
+
 @router.delete("/flashcards/{flashcard_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_flashcard(
     flashcard_id: uuid.UUID,
@@ -60,3 +71,21 @@ def delete_flashcard(
     db.delete(card)
     db.commit()
     return None
+
+
+def _get_owned_flashcard(flashcard_id: uuid.UUID, db: Session, current_user: User) -> Flashcard:
+    card = db.get(Flashcard, flashcard_id)
+    if not card or card.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flashcard not found")
+    return card
+
+
+@router.post("/flashcards/{flashcard_id}/review", response_model=FlashcardOut)
+def review_flashcard(
+    flashcard_id: uuid.UUID,
+    payload: ReviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    card = _get_owned_flashcard(flashcard_id, db, current_user)
+    return fsrs_service.review_flashcard(card, payload.rating, db, payload.review_duration_ms)

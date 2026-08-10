@@ -1,7 +1,7 @@
-"""Flashcard tests: generate (mocked LLM), list, delete, ownership isolation.
-
-FSRS review/scheduling tests land in the flashcards-fsrs follow-up step
-(test_fsrs_service.py) once fsrs_service.py is implemented.
+"""Flashcard tests: generate (mocked LLM), list, delete, ownership isolation,
+due-cards lookup, and review submission. FSRS scheduling *math* itself
+(difficulty/interval behavior) is covered in test_fsrs_service.py — these
+tests just check the HTTP layer wires up correctly.
 """
 
 
@@ -91,4 +91,55 @@ def test_user_cannot_generate_for_other_users_note(client, mock_llm):
 
     _register(client, email="userB2@example.com")
     resp = client.post(f"/api/notes/{note_id}/flashcards/generate")
+    assert resp.status_code == 404
+
+
+def test_due_flashcards_requires_auth(client):
+    resp = client.get("/api/flashcards/due")
+    assert resp.status_code == 401
+
+
+def test_new_flashcards_are_immediately_due(client, mock_llm):
+    # FSRS cards are due immediately on creation, before any review.
+    _register(client)
+    note_id = _create_note(client)
+    client.post(f"/api/notes/{note_id}/flashcards/generate")
+
+    resp = client.get("/api/flashcards/due")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+def test_review_flashcard_updates_state(client, mock_llm):
+    _register(client)
+    note_id = _create_note(client)
+    card_id = client.post(f"/api/notes/{note_id}/flashcards/generate").json()["flashcards"][0]["id"]
+
+    resp = client.post(f"/api/flashcards/{card_id}/review", json={"rating": 3})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["reps"] == 1
+    assert body["state"] in (1, 2, 3)  # 1=Learning, 2=Review, 3=Relearning (no "New" in py-fsrs 4.x)
+    # due date should be freshly recalculated (updated_at-style behavior:
+    # not the same instant the card was created)
+    assert body["due"] is not None
+
+
+def test_review_rejects_invalid_rating(client, mock_llm):
+    _register(client)
+    note_id = _create_note(client)
+    card_id = client.post(f"/api/notes/{note_id}/flashcards/generate").json()["flashcards"][0]["id"]
+
+    resp = client.post(f"/api/flashcards/{card_id}/review", json={"rating": 5})
+    assert resp.status_code == 422
+
+
+def test_review_for_other_users_card_returns_404(client, mock_llm):
+    _register(client, email="userA3@example.com")
+    note_id = _create_note(client)
+    card_id = client.post(f"/api/notes/{note_id}/flashcards/generate").json()["flashcards"][0]["id"]
+    client.post("/api/auth/logout")
+
+    _register(client, email="userB3@example.com")
+    resp = client.post(f"/api/flashcards/{card_id}/review", json={"rating": 3})
     assert resp.status_code == 404

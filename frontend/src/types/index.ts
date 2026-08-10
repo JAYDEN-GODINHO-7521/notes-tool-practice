@@ -28,9 +28,29 @@ export interface Flashcard {
   back: string;
   front_variants: string[];
   variant_index: number;
+  display_front: string;
   state: number;
   due: string;
+  stability: number;
+  difficulty: number;
   reps: number;
   lapses: number;
   created_at: string;
+}
+
+export type Rating = 1 | 2 | 3 | 4; // Again, Hard, Good, Easy
+
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface StudyStats {
+  reviews_per_day: DailyCount[];
+  retention_rate_7d: number;
+  retention_rate_30d: number;
+  due_count: number;
+  reviewed_today: number;
+  streak_days: number;
+  avg_difficulty: number;
 }

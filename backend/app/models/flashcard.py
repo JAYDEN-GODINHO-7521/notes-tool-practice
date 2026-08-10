@@ -1,8 +1,12 @@
 """Flashcard model (FSRS fields).
 
-FSRS scheduling fields are stored here now but only given sane initial
-defaults on creation in this step; the actual FSRS repeat()/scheduling
-logic (fsrs_service.py) is implemented in the flashcards-fsrs follow-up step.
+The canonical FSRS scheduling state lives in `fsrs_card_data` (the FSRS
+package's own Card serialized to JSON via Card.to_dict()/from_dict()), so
+fsrs_service.py never has to lossily reconstruct a Card from separate
+columns. The individual due/state/stability/difficulty columns below are
+kept in sync with that JSON after every review, purely so the app can
+query/sort/aggregate (due-card lookups, Study Hub charts) without
+deserializing JSON on every row.
 """
 import uuid
 from datetime import datetime, timezone
@@ -26,18 +30,20 @@ class Flashcard(Base):
 
     front: Mapped[str] = mapped_column(String, nullable=False)
     back: Mapped[str] = mapped_column(String, nullable=False)
-    # Alternate phrasings of the front, rotated per session (flashcards-fsrs step)
+    # Alternate phrasings of `front` from the LLM (does NOT include `front`
+    # itself — see display_front below for the combined rotation list).
     front_variants: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     variant_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # FSRS scheduling state
+    # FSRS scheduling state — see module docstring.
+    fsrs_card_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     stability: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     difficulty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     elapsed_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     scheduled_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     lapses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    state: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0=Learning
+    state: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=Learning,2=Review,3=Relearning
     due: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -48,3 +54,12 @@ class Flashcard(Base):
     )
 
     note: Mapped["Note"] = relationship()
+
+    @property
+    def display_front(self) -> str:
+        """The front phrasing to show this session — rotates through the
+        original `front` plus all LLM-generated variants."""
+        options = [self.front, *self.front_variants]
+        if not options:
+            return self.front
+        return options[self.variant_index % len(options)]

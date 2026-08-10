@@ -1,18 +1,14 @@
-"""Generate Flashcard rows from a note via llm_service, with FSRS initial state.
-
-FSRS scheduling itself (repeat(), due-date math) is implemented in
-fsrs_service.py as part of the flashcards-fsrs follow-up step; here, new
-cards just get sane defaults (state=Learning, due=now) so they show up
-immediately in a "due" query once that step lands.
+"""Generate Flashcard rows from a note via llm_service, with real FSRS
+initial state (via fsrs_service.new_fsrs_card(), not a hardcoded placeholder).
 """
 import json
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models.flashcard import Flashcard
 from app.models.note import Note
 from app.services import llm_service, prompts
+from app.services.fsrs_service import new_fsrs_card, state_to_int
 
 MAX_CARDS_PER_GENERATION = 8
 
@@ -74,18 +70,19 @@ async def generate_flashcards_for_note(note: Note, db: Session) -> list[Flashcar
     raw = await llm_service.generate_json(system, user_prompt)
     cards_data = _parse_cards(raw)
 
-    now = datetime.now(timezone.utc)
     created: list[Flashcard] = []
     for card in cards_data:
         variants = card.get("variants") or []
+        fresh = new_fsrs_card()
         flashcard = Flashcard(
             note_id=note.id,
             user_id=note.user_id,
             front=str(card["front"]),
             back=str(card["back"]),
             front_variants=[str(v) for v in variants if v],
-            state=0,  # Learning
-            due=now,
+            state=state_to_int(fresh.state),
+            due=fresh.due,
+            fsrs_card_data=fresh.to_dict(),
         )
         db.add(flashcard)
         created.append(flashcard)
