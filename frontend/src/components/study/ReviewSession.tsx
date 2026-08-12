@@ -11,7 +11,10 @@ interface ReviewSessionProps {
 export default function ReviewSession({ cards, onDone }: ReviewSessionProps) {
   const [index, setIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const cardShownAt = useRef(Date.now());
+  // Initialize with a static value (not Date.now(), which is impure during
+  // render) — the effect below sets the real timestamp right after mount
+  // and on every card change.
+  const cardShownAt = useRef<number>(0);
 
   useEffect(() => {
     cardShownAt.current = Date.now();

@@ -11,17 +11,17 @@ export default function StudyHub() {
   const [sessionCards, setSessionCards] = useState<Flashcard[] | null>(null);
   const [startingSession, setStartingSession] = useState(false);
 
-  async function refreshStats() {
-    setLoadingStats(true);
+  async function fetchStats() {
     try {
-      setStats(await getStudyStats());
+      const data = await getStudyStats();   // ← await comes FIRST now
+      setStats(data);
     } finally {
       setLoadingStats(false);
     }
   }
 
   useEffect(() => {
-    refreshStats();
+    fetchStats();
   }, []);
 
   async function handleStartRevise() {
