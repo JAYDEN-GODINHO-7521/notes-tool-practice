@@ -36,7 +36,8 @@ export default function StudyHub() {
 
   async function handleSessionDone() {
     setSessionCards(null);
-    await refreshStats();
+    setLoadingStats(true);
+    await fetchStats();
   }
 
   return (
