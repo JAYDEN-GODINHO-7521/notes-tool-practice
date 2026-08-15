@@ -2,8 +2,18 @@
 import { apiClient } from "./client";
 import type { Note, NoteCreateInput, NoteUpdateInput } from "../types";
 
-export async function listNotes(params?: { search?: string; archived?: boolean }): Promise<Note[]> {
-  const { data } = await apiClient.get<Note[]>("/api/notes", { params });
+export async function listNotes(params?: {
+  search?: string;
+  archived?: boolean;
+  labelId?: string;
+}): Promise<Note[]> {
+  const { data } = await apiClient.get<Note[]>("/api/notes", {
+    params: {
+      search: params?.search,
+      archived: params?.archived,
+      label_id: params?.labelId,
+    },
+  });
   return data;
 }
 
@@ -24,4 +34,8 @@ export async function updateNote(id: string, input: NoteUpdateInput): Promise<No
 
 export async function deleteNote(id: string): Promise<void> {
   await apiClient.delete(`/api/notes/${id}`);
+}
+
+export async function reorderNotes(noteIds: string[]): Promise<void> {
+  await apiClient.post("/api/notes/reorder", { note_ids: noteIds });
 }

@@ -21,7 +21,12 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: EmailStr
     name: str
+    notes_view: str
 
 
 class UserResponse(BaseModel):
     user: UserOut
+
+
+class PreferencesUpdate(BaseModel):
+    notes_view: str = Field(pattern="^(grid|list)$")

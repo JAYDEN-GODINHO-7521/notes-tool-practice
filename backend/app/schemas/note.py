@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.label import LabelOut
+
 
 class NoteCreate(BaseModel):
     title: str = ""
@@ -12,6 +14,7 @@ class NoteCreate(BaseModel):
     color: str = "default"
     pinned: bool = False
     archived: bool = False
+    label_ids: list[uuid.UUID] = []
 
 
 class NoteUpdate(BaseModel):
@@ -20,6 +23,7 @@ class NoteUpdate(BaseModel):
     color: str | None = None
     pinned: bool | None = None
     archived: bool | None = None
+    label_ids: list[uuid.UUID] | None = None  # None = don't touch labels; [] = clear all
 
 
 class NoteOut(BaseModel):
@@ -31,5 +35,11 @@ class NoteOut(BaseModel):
     color: str
     pinned: bool
     archived: bool
+    position: float
+    labels: list[LabelOut]
     created_at: datetime
     updated_at: datetime
+
+
+class ReorderRequest(BaseModel):
+    note_ids: list[uuid.UUID]  

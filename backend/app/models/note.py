@@ -2,13 +2,13 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.label import note_labels
 
-# JSONB on Postgres (production), plain JSON on SQLite (unit tests)
 JSONVariant = JSONB().with_variant(JSON(), "sqlite")
 
 
@@ -20,11 +20,11 @@ class Note(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), default="", nullable=False)
-    # TipTap JSON document (may contain LaTeX math nodes).
     content: Mapped[dict] = mapped_column(JSONVariant, default=dict, nullable=False)
     color: Mapped[str] = mapped_column(String(32), default="default", nullable=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    position: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
@@ -35,3 +35,4 @@ class Note(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="notes")
+    labels: Mapped[list["Label"]] = relationship(secondary=note_labels, order_by="Label.name")

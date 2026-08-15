@@ -2,6 +2,14 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  notes_view: "grid" | "list";
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+  created_at: string;
 }
 
 export interface Note {
@@ -11,13 +19,15 @@ export interface Note {
   color: string;
   pinned: boolean;
   archived: boolean;
+  position: number;
+  labels: Label[];
   created_at: string;
   updated_at: string;
 }
 
 export type NoteCreateInput = Partial<
   Pick<Note, "title" | "content" | "color" | "pinned" | "archived">
->;
+> & { label_ids?: string[] };
 
 export type NoteUpdateInput = NoteCreateInput;
 

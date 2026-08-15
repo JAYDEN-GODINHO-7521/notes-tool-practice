@@ -13,3 +13,34 @@ body {
 .katex {
   color: inherit;
 }
+
+/* Layered "floating paper" shadow for cards + the search box — a soft wide
+   ambient shadow plus a tighter contact shadow, with a gentle hover lift
+   for anything interactive. */
+.shadow-3d {
+  box-shadow:
+    0 1px 2px rgba(34, 31, 26, 0.06),
+    0 4px 8px rgba(34, 31, 26, 0.08),
+    0 14px 28px -10px rgba(34, 31, 26, 0.14);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.shadow-3d-hover:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px rgba(34, 31, 26, 0.08),
+    0 10px 18px rgba(34, 31, 26, 0.12),
+    0 24px 36px -10px rgba(34, 31, 26, 0.2);
+}
+
+/* Static (non-hover-lifting) variant for things like the search box, which
+   shouldn't visually "float up" while you're typing in it. */
+.shadow-3d-static {
+  box-shadow:
+    0 1px 2px rgba(34, 31, 26, 0.05),
+    0 3px 6px rgba(34, 31, 26, 0.06),
+    0 8px 16px -6px rgba(34, 31, 26, 0.1);
+}
+
+.dragging-note {
+  opacity: 0.4;
+}

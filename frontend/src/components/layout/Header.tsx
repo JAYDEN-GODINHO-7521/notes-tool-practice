@@ -4,17 +4,10 @@ import { useAuth } from "../../hooks/useAuth";
 interface HeaderProps {
   search?: string;
   onSearchChange?: (value: string) => void;
-  showArchived?: boolean;
-  onToggleArchived?: () => void;
 }
 
-export default function Header({
-  search,
-  onSearchChange,
-  showArchived,
-  onToggleArchived,
-}: HeaderProps) {
-  const { user, logout } = useAuth();
+export default function Header({ search, onSearchChange }: HeaderProps) {
+  const { user, logout, setNotesView } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const onDashboard = location.pathname === "/";
@@ -37,20 +30,35 @@ export default function Header({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search notes"
-              className="w-full rounded-full border border-line bg-white px-4 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-moss/40 focus:border-moss"
+              className="w-full rounded-full border border-line bg-white px-4 py-1.5 text-sm shadow-3d-static focus:outline-none focus:ring-2 focus:ring-moss/40 focus:border-moss"
             />
           </div>
         )}
 
         <nav className="ml-auto flex items-center gap-4 text-sm font-sans">
-          {onDashboard && onToggleArchived && (
-            <button
-              type="button"
-              onClick={onToggleArchived}
-              className="text-ink/60 hover:text-moss"
-            >
-              {showArchived ? "Active notes" : "Archived"}
-            </button>
+          {onDashboard && user && (
+            <div className="flex items-center gap-1 rounded-full border border-line bg-white p-0.5">
+              <button
+                type="button"
+                onClick={() => setNotesView("grid")}
+                title="Grid view"
+                className={`rounded-full px-2.5 py-1 text-xs ${
+                  user.notes_view === "grid" ? "bg-moss/15 text-moss-dark" : "text-ink/50 hover:text-ink"
+                }`}
+              >
+                ▦
+              </button>
+              <button
+                type="button"
+                onClick={() => setNotesView("list")}
+                title="List view"
+                className={`rounded-full px-2.5 py-1 text-xs ${
+                  user.notes_view === "list" ? "bg-moss/15 text-moss-dark" : "text-ink/50 hover:text-ink"
+                }`}
+              >
+                ☰
+              </button>
+            </div>
           )}
           <Link to="/study" className="text-ink/60 hover:text-moss">
             Study Hub

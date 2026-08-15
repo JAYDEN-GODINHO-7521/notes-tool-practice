@@ -25,3 +25,8 @@ export async function getCurrentUser(): Promise<User> {
 export async function logoutUser(): Promise<void> {
   await apiClient.post("/api/auth/logout");
 }
+
+export async function updateNotesViewPreference(view: "grid" | "list"): Promise<User> {
+  const { data } = await apiClient.patch<User>("/api/auth/me/preferences", { notes_view: view });
+  return data;
+}

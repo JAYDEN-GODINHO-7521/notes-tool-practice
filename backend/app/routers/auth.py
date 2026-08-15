@@ -1,4 +1,4 @@
-"""Auth router: /api/auth/register, /login, /me, /logout.
+"""Auth router: /api/auth/register, /login, /me, /logout, /me/preferences.
 
 JWT is delivered as an httpOnly cookie (see project design's JWT-httpOnly-cookie
 transport). Login/register never return the token in the JSON body.
@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
-from app.schemas.auth import LoginSchema, RegisterSchema, UserOut, UserResponse
+from app.schemas.auth import (
+    LoginSchema,
+    PreferencesUpdate,
+    RegisterSchema,
+    UserOut,
+    UserResponse,
+)
 from app.services.auth_service import create_access_token, hash_password, verify_password
 
 router = APIRouter()
@@ -22,7 +28,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,      # HTTPS only in prod (set False only for plain-http local dev if needed)
+        secure=True,
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",
@@ -58,6 +64,18 @@ def login(payload: LoginSchema, response: Response, db: Session = Depends(get_db
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me/preferences", response_model=UserOut)
+def update_preferences(
+    payload: PreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.notes_view = payload.notes_view
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
