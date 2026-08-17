@@ -2,7 +2,7 @@ import { generateHTML } from "@tiptap/html";
 import Highlight from "@tiptap/extension-highlight";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import StarterKit from "@tiptap/starter-kit";
-import { useMemo, type DragEvent } from "react";
+import { useMemo } from "react";
 import type { Note } from "../../types";
 import { NOTE_COLORS } from "./noteColors";
 
