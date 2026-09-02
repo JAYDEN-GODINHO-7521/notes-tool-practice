@@ -11,7 +11,7 @@ def _register(client, email="owner@example.com"):
 
 def test_create_and_list_note(client):
     _register(client)
-    create_resp = client.post("/api/notes", json={"title": "Hello", "content": {"a": 1}})
+    create_resp = client.post("/api/notes", json={"title": "Hello", "content": "Hello world"})
     assert create_resp.status_code == 201
     note_id = create_resp.json()["id"]
 
@@ -60,3 +60,73 @@ def test_user_cannot_access_other_users_note(client):
     _register(client, email="userB@example.com")
     resp = client.get(f"/api/notes/{note_id}")
     assert resp.status_code == 404
+
+
+def test_highlighted_spans_kept_when_valid_substring(client):
+    _register(client)
+    resp = client.post(
+        "/api/notes",
+        json={
+            "title": "Bio notes",
+            "content": "Mitochondria is the powerhouse of the cell.",
+            "highlighted_spans": ["Mitochondria is the powerhouse of the cell."],
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["highlighted_spans"] == ["Mitochondria is the powerhouse of the cell."]
+
+
+def test_highlighted_spans_dropped_when_not_in_content(client):
+    _register(client)
+    resp = client.post(
+        "/api/notes",
+        json={
+            "title": "Bio notes",
+            "content": "Mitochondria is the powerhouse of the cell.",
+            "highlighted_spans": ["This text is not in the note"],
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["highlighted_spans"] == []
+
+
+def test_highlighted_spans_dropped_on_update_when_content_changes(client):
+    _register(client)
+    note_id = client.post(
+        "/api/notes",
+        json={
+            "title": "Bio notes",
+            "content": "Mitochondria is the powerhouse of the cell.",
+            "highlighted_spans": ["Mitochondria is the powerhouse of the cell."],
+        },
+    ).json()["id"]
+
+    # Editing content so the previously-valid span no longer appears
+    # verbatim — the stale span should be silently dropped, per the
+    # sidecar-metadata staleness policy, not kept or rejected.
+    patch_resp = client.patch(
+        f"/api/notes/{note_id}",
+        json={"content": "Completely different content now."},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["highlighted_spans"] == []
+
+
+def test_highlighted_spans_updated_directly_still_validated(client):
+    _register(client)
+    note_id = client.post(
+        "/api/notes",
+        json={"title": "Bio notes", "content": "Photosynthesis converts light into energy."},
+    ).json()["id"]
+
+    patch_resp = client.patch(
+        f"/api/notes/{note_id}",
+        json={
+            "highlighted_spans": [
+                "Photosynthesis converts light into energy.",
+                "not present in content",
+            ]
+        },
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["highlighted_spans"] == ["Photosynthesis converts light into energy."]

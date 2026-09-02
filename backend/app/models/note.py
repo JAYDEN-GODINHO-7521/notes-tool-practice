@@ -1,15 +1,11 @@
-"""Note model."""
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Uuid
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.label import note_labels
-
-JSONVariant = JSONB().with_variant(JSON(), "sqlite")
 
 
 class Note(Base):
@@ -20,7 +16,8 @@ class Note(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     title: Mapped[str] = mapped_column(String(255), default="", nullable=False)
-    content: Mapped[dict] = mapped_column(JSONVariant, default=dict, nullable=False)
+    content: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    highlighted_spans: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     color: Mapped[str] = mapped_column(String(32), default="default", nullable=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

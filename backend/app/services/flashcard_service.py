@@ -1,5 +1,10 @@
 """Generate Flashcard rows from a note via llm_service, with real FSRS
 initial state (via fsrs_service.new_fsrs_card(), not a hardcoded placeholder).
+
+Post markdown-editor-migration (ADR-001): Note.content is plain markdown
+text, and "highlighted" passages come from the Note.highlighted_spans
+sidecar field (set via the editor's "Mark for flashcards" selection-menu
+action) rather than being parsed out of inline TipTap markup.
 """
 import json
 
@@ -13,31 +18,13 @@ from app.services.fsrs_service import ensure_aware, new_fsrs_card, state_to_int
 MAX_CARDS_PER_GENERATION = 8
 
 
-def _extract_text_and_highlights(node: dict | None) -> tuple[str, list[str]]:
-    """Flatten a TipTap JSON document into plain text (LaTeX delimiters are
-    stored as plain text within text nodes, so this preserves them as-is),
-    and separately collect the text of any spans marked with the Highlight
-    mark, so flashcard generation can prioritize them."""
-    if not node:
-        return "", []
-
-    parts: list[str] = []
-    highlights: list[str] = []
-
-    def walk(n: dict) -> None:
-        if n.get("type") == "text":
-            text = n.get("text", "")
-            parts.append(text)
-            marks = n.get("marks") or []
-            if any(m.get("type") == "highlight" for m in marks) and text.strip():
-                highlights.append(text.strip())
-        for child in n.get("content", []) or []:
-            walk(child)
-        if n.get("type") in ("paragraph", "heading"):
-            parts.append("\n")
-
-    walk(node)
-    return "".join(parts).strip(), highlights
+def _extract_text_and_highlights(note: Note) -> tuple[str, list[str]]:
+    content_text = (note.content or "").strip()
+    # Defensive re-check against staleness — highlighted_spans should
+    # already be cleaned on save (see routers/notes.py's _clean_spans),
+    # but don't trust that blindly here.
+    highlights = [s for s in (note.highlighted_spans or []) if s and s in content_text]
+    return content_text, highlights
 
 
 def _parse_cards(raw: str) -> list[dict]:
@@ -63,7 +50,7 @@ def _parse_cards(raw: str) -> list[dict]:
 
 
 async def generate_flashcards_for_note(note: Note, db: Session) -> list[Flashcard]:
-    content_text, highlighted_text = _extract_text_and_highlights(note.content)
+    content_text, highlighted_text = _extract_text_and_highlights(note)
     system, user_prompt = prompts.flashcard_generation_prompt(
         note.title, content_text, highlighted_text
     )

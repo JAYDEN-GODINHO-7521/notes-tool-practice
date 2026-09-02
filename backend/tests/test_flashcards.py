@@ -17,17 +17,7 @@ def _create_note(client, title="Photosynthesis"):
         "/api/notes",
         json={
             "title": title,
-            "content": {
-                "type": "doc",
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [
-                            {"type": "text", "text": "Plants convert sunlight into energy."}
-                        ],
-                    }
-                ],
-            },
+            "content": "Plants convert sunlight into energy.",
         },
     )
     return resp.json()["id"]
@@ -143,3 +133,71 @@ def test_review_for_other_users_card_returns_404(client, mock_llm):
     _register(client, email="userB3@example.com")
     resp = client.post(f"/api/flashcards/{card_id}/review", json={"rating": 3})
     assert resp.status_code == 404
+
+
+def test_generation_prioritizes_highlighted_spans(client, monkeypatch):
+    """The LLM prompt should call out highlighted_spans as passages to
+    prioritize — this doesn't use the shared mock_llm fixture since it
+    needs to *inspect* the prompt sent to generate_json, not just return
+    a canned response."""
+    captured = {}
+
+    async def fake_generate_json(system: str, user_prompt: str) -> str:
+        captured["system"] = system
+        captured["user_prompt"] = user_prompt
+        return '{"cards": [{"front": "What is the powerhouse of the cell?", "back": "Mitochondria", "variants": []}]}'
+
+    monkeypatch.setattr("app.services.llm_service.generate_json", fake_generate_json)
+
+    _register(client)
+    note_resp = client.post(
+        "/api/notes",
+        json={
+            "title": "Cell Biology",
+            "content": "Mitochondria is the powerhouse of the cell. It produces ATP via respiration.",
+            "highlighted_spans": ["Mitochondria is the powerhouse of the cell."],
+        },
+    )
+    assert note_resp.json()["highlighted_spans"] == ["Mitochondria is the powerhouse of the cell."]
+    note_id = note_resp.json()["id"]
+
+    resp = client.post(f"/api/notes/{note_id}/flashcards/generate")
+    assert resp.status_code == 200
+    assert resp.json()["created"] == 1
+
+    assert "Mitochondria is the powerhouse of the cell." in captured["user_prompt"]
+    assert "prioritize" in captured["user_prompt"].lower()
+    # The rest of the note content should still be sent too — highlighting
+    # narrows priority, it doesn't exclude the rest of the note.
+    assert "It produces ATP via respiration." in captured["user_prompt"]
+
+
+def test_generation_ignores_stale_highlighted_spans(client, db_session, monkeypatch):
+    """flashcard_service.py's own defensive re-check against stale
+    highlighted_spans should hold even independent of routers/notes.py's
+    cleaning — exercised here by writing a stale span directly to the DB,
+    bypassing the API/router entirely."""
+    import uuid
+    from app.models.note import Note
+
+    captured = {}
+
+    async def fake_generate_json(system: str, user_prompt: str) -> str:
+        captured["user_prompt"] = user_prompt
+        return '{"cards": [{"front": "Q", "back": "A", "variants": []}]}'
+
+    monkeypatch.setattr("app.services.llm_service.generate_json", fake_generate_json)
+
+    _register(client)
+    note_id = client.post(
+        "/api/notes",
+        json={"title": "Note", "content": "Original sentence about frogs."},
+    ).json()["id"]
+
+    note = db_session.get(Note, uuid.UUID(note_id))
+    note.highlighted_spans = ["this text was never in the note"]
+    db_session.commit()
+
+    resp = client.post(f"/api/notes/{note_id}/flashcards/generate")
+    assert resp.status_code == 200
+    assert "this text was never in the note" not in captured["user_prompt"]

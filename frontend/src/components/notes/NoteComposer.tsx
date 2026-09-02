@@ -1,21 +1,24 @@
-/** Keep-style "Take a note…" box: collapsed by default, expands into a
- * title + rich-text editor + color picker + labels on focus, saves on
- * blur/close. */
-import type { JSONContent } from "@tiptap/core";
-import { useRef, useState } from "react";
+/**
+ * Composer for creating a new note. Post markdown-editor-migration
+ * (ADR-001): content is a plain string, highlighted_spans is separate
+ * sidecar state threaded through from MarkdownEditor's "Mark for
+ * flashcards" action, and stale spans are re-filtered against the final
+ * content right before saving (defense-in-depth — the backend also
+ * cleans on save).
+ */
+import { useState } from "react";
 import type { Label } from "../../types";
 import LabelPicker from "./LabelPicker";
+import MarkdownEditor from "./MarkdownEditor";
 import { NOTE_COLOR_KEYS, NOTE_COLORS } from "./noteColors";
-import RichTextEditor from "./RichTextEditor";
-
-const EMPTY_CONTENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
 interface NoteComposerProps {
   allLabels: Label[];
   onLabelCreated: (label: Label) => void;
   onCreate: (input: {
     title: string;
-    content: JSONContent;
+    content: string;
+    highlighted_spans: string[];
     color: string;
     label_ids: string[];
   }) => Promise<void>;
@@ -24,31 +27,41 @@ interface NoteComposerProps {
 export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: NoteComposerProps) {
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState<JSONContent>(EMPTY_CONTENT);
+  const [content, setContent] = useState("");
+  const [highlightedSpans, setHighlightedSpans] = useState<string[]>([]);
   const [color, setColor] = useState("default");
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   function isEmpty() {
-    const text = JSON.stringify(content);
-    return !title.trim() && (!content.content || text === JSON.stringify(EMPTY_CONTENT));
+    return !title.trim() && !content.trim();
+  }
+
+  function reset() {
+    setTitle("");
+    setContent("");
+    setHighlightedSpans([]);
+    setColor("default");
+    setLabelIds([]);
+    setExpanded(false);
   }
 
   async function handleClose() {
     if (!isEmpty()) {
       setSaving(true);
       try {
-        await onCreate({ title: title.trim(), content, color, label_ids: labelIds });
+        await onCreate({
+          title: title.trim(),
+          content,
+          highlighted_spans: highlightedSpans.filter((s) => content.includes(s)),
+          color,
+          label_ids: labelIds,
+        });
       } finally {
         setSaving(false);
       }
     }
-    setTitle("");
-    setContent(EMPTY_CONTENT);
-    setColor("default");
-    setLabelIds([]);
-    setExpanded(false);
+    reset();
   }
 
   if (!expanded) {
@@ -56,7 +69,7 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="w-full max-w-xl mx-auto block text-left rounded-2xl border border-line bg-white px-5 py-3.5 text-ink/50 font-sans text-sm shadow-3d shadow-3d-hover"
+        className="w-full max-w-xl mx-auto block text-left rounded-2xl border border-line bg-white px-5 py-3.5 text-ink/50 font-sans text-sm shadow-3d-static hover:shadow-3d-hover"
       >
         Take a note…
       </button>
@@ -66,10 +79,7 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
   const bg = NOTE_COLORS[color]?.bg ?? NOTE_COLORS.default.bg;
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full max-w-xl mx-auto rounded-2xl border border-line ${bg} p-5 shadow-3d`}
-    >
+    <div className={`w-full max-w-xl mx-auto rounded-2xl border border-line ${bg} p-5 shadow-3d`}>
       <input
         autoFocus
         value={title}
@@ -77,7 +87,12 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
         placeholder="Title"
         className="w-full bg-transparent font-display text-lg text-ink placeholder:text-ink/40 focus:outline-none mb-2"
       />
-      <RichTextEditor content={content} onChange={setContent} />
+      <MarkdownEditor
+        content={content}
+        onChange={setContent}
+        highlightedSpans={highlightedSpans}
+        onHighlightedSpansChange={setHighlightedSpans}
+      />
 
       <div className="mt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">

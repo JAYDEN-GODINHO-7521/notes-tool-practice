@@ -33,6 +33,13 @@ def _get_owned_labels(label_ids: list[uuid.UUID], db: Session, current_user: Use
     return list(labels)
 
 
+def _clean_spans(content: str, spans: list[str]) -> list[str]:
+    """Drop any highlighted span that's no longer a literal substring of
+    `content` — the sidecar-metadata staleness policy from ADR-001: silently
+    drop stale spans on save, no fuzzy re-anchoring."""
+    return [s for s in spans if s and s in content]
+
+
 @router.get("", response_model=list[NoteOut])
 def list_notes(
     search: str | None = Query(default=None),
@@ -67,6 +74,9 @@ def create_note(
     next_position = (max_position or 0.0) + 1.0
 
     data = payload.model_dump(exclude={"label_ids"})
+    data["highlighted_spans"] = _clean_spans(
+        data.get("content", ""), data.get("highlighted_spans", [])
+    )
     note = Note(user_id=current_user.id, position=next_position, **data)
     note.labels = _get_owned_labels(payload.label_ids, db, current_user)
     db.add(note)
@@ -95,6 +105,9 @@ def update_note(
     updates = payload.model_dump(exclude_unset=True, exclude={"label_ids"})
     for field, value in updates.items():
         setattr(note, field, value)
+
+    if "content" in updates or "highlighted_spans" in updates:
+        note.highlighted_spans = _clean_spans(note.content, note.highlighted_spans)
 
     if payload.label_ids is not None:
         note.labels = _get_owned_labels(payload.label_ids, db, current_user)

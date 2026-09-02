@@ -15,7 +15,8 @@ export interface Label {
 export interface Note {
   id: string;
   title: string;
-  content: Record<string, unknown>; // TipTap JSON document
+  content: string; 
+  highlighted_spans: string[]; 
   color: string;
   pinned: boolean;
   archived: boolean;
@@ -26,7 +27,7 @@ export interface Note {
 }
 
 export type NoteCreateInput = Partial<
-  Pick<Note, "title" | "content" | "color" | "pinned" | "archived">
+  Pick<Note, "title" | "content" | "color" | "pinned" | "archived" | "highlighted_spans">
 > & { label_ids?: string[] };
 
 export type NoteUpdateInput = NoteCreateInput;
@@ -48,7 +49,7 @@ export interface Flashcard {
   created_at: string;
 }
 
-export type Rating = 1 | 2 | 3 | 4; // Again, Hard, Good, Easy
+export type Rating = 1 | 2 | 3 | 4; 
 
 export interface DailyCount {
   date: string;

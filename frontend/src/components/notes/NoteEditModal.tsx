@@ -1,10 +1,16 @@
-import type { JSONContent } from "@tiptap/core";
+/**
+ * Edit modal for an existing note. Post markdown-editor-migration
+ * (ADR-001): swaps RichTextEditor -> MarkdownEditor and threads
+ * highlighted_spans as sidecar state. Everything else this modal did
+ * before the migration — labels, pin/archive/color toggles, Generate
+ * Flashcards — is preserved.
+ */
 import { useState } from "react";
 import type { Label, Note } from "../../types";
 import GenerateFlashcardsButton from "./GenerateFlashcardsButton";
 import LabelPicker from "./LabelPicker";
+import MarkdownEditor from "./MarkdownEditor";
 import { NOTE_COLOR_KEYS, NOTE_COLORS } from "./noteColors";
-import RichTextEditor from "./RichTextEditor";
 
 interface NoteEditModalProps {
   note: Note;
@@ -13,11 +19,16 @@ interface NoteEditModalProps {
   onClose: () => void;
   onSave: (
     id: string,
-    input: { title: string; content: JSONContent; color: string; label_ids: string[] }
+    input: {
+      title: string;
+      content: string;
+      highlighted_spans: string[];
+      color: string;
+      label_ids: string[];
+    }
   ) => Promise<void>;
   onDelete: (note: Note) => void;
 }
-
 
 export default function NoteEditModal({
   note,
@@ -28,7 +39,8 @@ export default function NoteEditModal({
   onDelete,
 }: NoteEditModalProps) {
   const [title, setTitle] = useState(note.title);
-  const [content, setContent] = useState<JSONContent>(note.content as JSONContent);
+  const [content, setContent] = useState(note.content);
+  const [highlightedSpans, setHighlightedSpans] = useState<string[]>(note.highlighted_spans);
   const [color, setColor] = useState(note.color);
   const [labelIds, setLabelIds] = useState<string[]>(note.labels.map((l) => l.id));
   const [saving, setSaving] = useState(false);
@@ -36,7 +48,13 @@ export default function NoteEditModal({
   async function handleClose() {
     setSaving(true);
     try {
-      await onSave(note.id, { title: title.trim(), content, color, label_ids: labelIds });
+      await onSave(note.id, {
+        title: title.trim(),
+        content,
+        highlighted_spans: highlightedSpans.filter((s) => content.includes(s)),
+        color,
+        label_ids: labelIds,
+      });
     } finally {
       setSaving(false);
       onClose();
@@ -46,10 +64,7 @@ export default function NoteEditModal({
   const bg = NOTE_COLORS[color]?.bg ?? NOTE_COLORS.default.bg;
 
   return (
-    <div
-      className="fixed inset-0 bg-ink/30 flex items-center justify-center p-4 z-50"
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 bg-ink/30 flex items-center justify-center p-4 z-50" onClick={handleClose}>
       <div
         className={`w-full max-w-xl rounded-2xl border border-line ${bg} p-6 shadow-3d max-h-[85vh] overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
@@ -60,7 +75,13 @@ export default function NoteEditModal({
           placeholder="Title"
           className="w-full bg-transparent font-display text-xl text-ink placeholder:text-ink/40 focus:outline-none mb-3"
         />
-        <RichTextEditor content={content} onChange={setContent} autoFocus />
+        <MarkdownEditor
+          content={content}
+          onChange={setContent}
+          highlightedSpans={highlightedSpans}
+          onHighlightedSpansChange={setHighlightedSpans}
+          autoFocus
+        />
 
         <div className="mt-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -106,7 +127,9 @@ export default function NoteEditModal({
           </div>
         </div>
 
-        <GenerateFlashcardsButton noteId={note.id} />
+        <div className="mt-4 pt-4 border-t border-line/60">
+          <GenerateFlashcardsButton noteId={note.id} />
+        </div>
       </div>
     </div>
   );

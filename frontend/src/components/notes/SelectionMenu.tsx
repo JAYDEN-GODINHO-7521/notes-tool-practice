@@ -1,22 +1,32 @@
-/** Right-click-style menu that appears when text is selected inside a
- * RichTextEditor: Paraphrase / Custom Request / Highlight. */
-import type { Editor } from "@tiptap/core";
+/** Menu that appears when text is selected inside the MarkdownEditor:
+ * Paraphrase / Custom request / Mark for flashcards. Operates on plain
+ * text (no TipTap) — replacement and highlighting are handled by the
+ * parent (MarkdownEditor) via onReplace/onToggleHighlight, which splice
+ * or record the given range against the raw markdown string. */
 import { useState, type FormEvent } from "react";
 import { streamGenerate, type AiAction } from "../../api/ai";
 
 type Mode = "menu" | "custom-input" | "loading" | "preview";
 
 interface SelectionMenuProps {
-  editor: Editor;
-  from: number;
-  to: number;
   text: string;
   top: number;
   left: number;
+  isHighlighted: boolean;
+  onReplace: (newText: string) => void;
+  onToggleHighlight: () => void;
   onClose: () => void;
 }
 
-export default function SelectionMenu({ editor, from, to, text, top, left, onClose }: SelectionMenuProps) {
+export default function SelectionMenu({
+  text,
+  top,
+  left,
+  isHighlighted,
+  onReplace,
+  onToggleHighlight,
+  onClose,
+}: SelectionMenuProps) {
   const [mode, setMode] = useState<Mode>("menu");
   const [instruction, setInstruction] = useState("");
   const [preview, setPreview] = useState("");
@@ -46,32 +56,19 @@ export default function SelectionMenu({ editor, from, to, text, top, left, onClo
     runGenerate("custom", instruction.trim());
   }
 
-  function handleHighlight() {
-    editor.chain().focus().setTextSelection({ from, to }).setHighlight().run();
-    onClose();
-  }
-
-  function handleReplace() {
-    editor
-      .chain()
-      .focus()
-      .setTextSelection({ from, to })
-      .deleteSelection()
-      .insertContent({ type: "text", text: preview })
-      .run();
-    onClose();
-  }
-
   return (
     <div
       className="fixed z-50 bg-white border border-line rounded-xl shadow-lg text-sm font-sans"
-      style={{ top, left, minWidth: mode === "menu" ? 170 : 280, maxWidth: 360 }}
+      style={{ top, left, minWidth: mode === "menu" ? 190 : 280, maxWidth: 360 }}
     >
       {mode === "menu" && (
         <div className="py-1">
           <MenuItem label="Paraphrase" onClick={() => runGenerate("paraphrase")} />
           <MenuItem label="Custom request…" onClick={() => setMode("custom-input")} />
-          <MenuItem label="Highlight" onClick={handleHighlight} />
+          <MenuItem
+            label={isHighlighted ? "Unmark for flashcards" : "Mark for flashcards"}
+            onClick={onToggleHighlight}
+          />
         </div>
       )}
 
@@ -101,7 +98,14 @@ export default function SelectionMenu({ editor, from, to, text, top, left, onClo
         <div className="p-4">
           <p className="text-ink/80 whitespace-pre-wrap mb-3">{preview}</p>
           <div className="flex items-center gap-4">
-            <button type="button" onClick={handleReplace} className="text-moss text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => {
+                onReplace(preview);
+                onClose();
+              }}
+              className="text-moss text-xs font-medium"
+            >
               Replace
             </button>
             <button type="button" onClick={onClose} className="text-ink/50 text-xs">

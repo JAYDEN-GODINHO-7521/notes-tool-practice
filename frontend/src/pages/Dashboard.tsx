@@ -1,4 +1,3 @@
-import type { JSONContent } from "@tiptap/core";
 import { useEffect, useState } from "react";
 import { listLabels } from "../api/labels";
 import { createNote, deleteNote, listNotes, reorderNotes, updateNote } from "../api/notes";
@@ -59,7 +58,8 @@ export default function Dashboard() {
 
   async function handleCreate(input: {
     title: string;
-    content: JSONContent;
+    content: string;
+    highlighted_spans: string[];
     color: string;
     label_ids: string[];
   }) {
@@ -69,7 +69,13 @@ export default function Dashboard() {
 
   async function handleSave(
     id: string,
-    input: { title: string; content: JSONContent; color: string; label_ids: string[] }
+    input: {
+      title: string;
+      content: string;
+      highlighted_spans: string[];
+      color: string;
+      label_ids: string[];
+    }
   ) {
     await updateNote(id, input);
     await refresh();

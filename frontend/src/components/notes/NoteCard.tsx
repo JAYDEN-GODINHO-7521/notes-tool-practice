@@ -1,9 +1,20 @@
-import { generateHTML } from "@tiptap/html";
-import Highlight from "@tiptap/extension-highlight";
-import { Mathematics } from "@tiptap/extension-mathematics";
-import StarterKit from "@tiptap/starter-kit";
+/**
+ * Note card (grid + list variants). Verified against the real
+ * frontend/src/components/notes/NoteCard.tsx and its caller
+ * (NotesGrid.tsx) from the JAYDEN-GODINHO-7521/notes-tool-practice repo —
+ * prop names/shapes below match that contract exactly (onOpen,
+ * onTogglePin(note), onToggleArchive(note), onDelete(note), listView
+ * boolean, isDragging/isDragOver/onDragEnd). An earlier version of this
+ * file invented a different, incompatible prop shape and was missing the
+ * Delete button entirely — this replaces it.
+ *
+ * Only the content-rendering internals changed from the original TipTap
+ * version: `generateHTML(note.content, [...])` -> lib/markdown.ts's
+ * renderMarkdownPreview(), which also paints highlighted_spans as <mark>.
+ */
 import { useMemo } from "react";
 import type { Note } from "../../types";
+import { renderMarkdownPreview } from "../../lib/markdown";
 import { NOTE_COLORS } from "./noteColors";
 
 interface NoteCardProps {
@@ -39,33 +50,26 @@ export default function NoteCard({
 }: NoteCardProps) {
   const color = NOTE_COLORS[note.color] ?? NOTE_COLORS.default;
 
-  const html = useMemo(() => {
-    try {
-      return generateHTML(note.content ?? { type: "doc", content: [] }, [
-        StarterKit,
-        Highlight,
-        Mathematics,
-      ]);
-    } catch {
-      return "";
-    }
-  }, [note.content]);
+  const html = useMemo(
+    () => renderMarkdownPreview(note.content, note.highlighted_spans),
+    [note.content, note.highlighted_spans]
+  );
 
   const dragProps = draggable
-  ? {
-      draggable: true,
-      onDragStart,
-      onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        onDragOver?.(e);
-      },
-      onDrop: (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        onDrop?.(e);
-      },
-      onDragEnd,
-    }
-  : {};
+    ? {
+        draggable: true,
+        onDragStart,
+        onDragOver: (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          onDragOver?.(e);
+        },
+        onDrop: (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          onDrop?.(e);
+        },
+        onDragEnd,
+      }
+    : {};
 
   const labelChips = note.labels.length > 0 && (
     <div className="flex flex-wrap gap-1 mt-2">
@@ -95,6 +99,9 @@ export default function NoteCard({
             {note.title && <h3 className="font-display text-sm text-ink truncate">{note.title}</h3>}
             <div
               className="prose prose-sm max-w-none font-sans text-ink/70 truncate [&_*]:inline"
+              // eslint-disable-next-line react/no-danger -- our own
+              // minimal markdown renderer (lib/markdown.ts), not raw
+              // model/user HTML
               dangerouslySetInnerHTML={{ __html: html }}
             />
           </div>
@@ -154,6 +161,8 @@ export default function NoteCard({
 
       <div
         className="prose prose-sm max-w-none font-sans text-ink/90 line-clamp-6"
+        // eslint-disable-next-line react/no-danger -- our own minimal
+        // markdown renderer (lib/markdown.ts), not raw model/user HTML
         dangerouslySetInnerHTML={{ __html: html }}
       />
 

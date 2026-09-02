@@ -1,7 +1,11 @@
-"""Note request/response schemas."""
+"""Note request/response schemas.
+
+`content` is now plain markdown text (was TipTap JSON) and `highlighted_spans`
+is the sidecar list of "marked for flashcards" substrings — see ADR-001 /
+session-summary-markdown-editor-migration.md and app/models/note.py.
+"""
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,7 +14,8 @@ from app.schemas.label import LabelOut
 
 class NoteCreate(BaseModel):
     title: str = ""
-    content: dict[str, Any] = {}
+    content: str = ""
+    highlighted_spans: list[str] = []
     color: str = "default"
     pinned: bool = False
     archived: bool = False
@@ -19,7 +24,8 @@ class NoteCreate(BaseModel):
 
 class NoteUpdate(BaseModel):
     title: str | None = None
-    content: dict[str, Any] | None = None
+    content: str | None = None
+    highlighted_spans: list[str] | None = None
     color: str | None = None
     pinned: bool | None = None
     archived: bool | None = None
@@ -31,7 +37,8 @@ class NoteOut(BaseModel):
 
     id: uuid.UUID
     title: str
-    content: dict[str, Any]
+    content: str
+    highlighted_spans: list[str]
     color: str
     pinned: bool
     archived: bool
@@ -42,4 +49,4 @@ class NoteOut(BaseModel):
 
 
 class ReorderRequest(BaseModel):
-    note_ids: list[uuid.UUID]  
+    note_ids: list[uuid.UUID]
