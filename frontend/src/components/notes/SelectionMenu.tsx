@@ -1,8 +1,3 @@
-/** Menu that appears when text is selected inside the MarkdownEditor:
- * Paraphrase / Custom request / Mark for flashcards. Operates on plain
- * text (no TipTap) — replacement and highlighting are handled by the
- * parent (MarkdownEditor) via onReplace/onToggleHighlight, which splice
- * or record the given range against the raw markdown string. */
 import { useState, type FormEvent } from "react";
 import { streamGenerate, type AiAction } from "../../api/ai";
 

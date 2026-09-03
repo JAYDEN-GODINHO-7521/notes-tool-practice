@@ -1,5 +1,3 @@
-/** "Generate Flashcards" button for the note editor toolbar. Only usable on
- * notes that already exist (have an id) — not in the unsaved composer. */
 import { useState } from "react";
 import { deleteFlashcard, generateFlashcards, listNoteFlashcards } from "../../api/flashcards";
 import type { Flashcard } from "../../types";

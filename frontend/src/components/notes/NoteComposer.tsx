@@ -1,11 +1,3 @@
-/**
- * Composer for creating a new note. Post markdown-editor-migration
- * (ADR-001): content is a plain string, highlighted_spans is separate
- * sidecar state threaded through from MarkdownEditor's "Mark for
- * flashcards" action, and stale spans are re-filtered against the final
- * content right before saving (defense-in-depth — the backend also
- * cleans on save).
- */
 import { useState } from "react";
 import type { Label } from "../../types";
 import LabelPicker from "./LabelPicker";

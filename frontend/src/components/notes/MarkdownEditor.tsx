@@ -1,11 +1,3 @@
-/**
- * Basic markdown editor: a plain textarea with a small formatting toolbar
- * (bold / italic / headings / lists) and a selection menu (paraphrase /
- * custom request / mark for flashcards). Replaces the old TipTap
- * rich-text + LaTeX editor — see ADR-001 /
- * session-summary-markdown-editor-migration.md. No live preview here; the
- * rendered/highlighted read view lives on NoteCard via lib/markdown.ts.
- */
 import { useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from "react";
 import SelectionMenu from "./SelectionMenu";
 

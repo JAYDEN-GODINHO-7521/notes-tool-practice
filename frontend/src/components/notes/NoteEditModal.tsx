@@ -1,10 +1,3 @@
-/**
- * Edit modal for an existing note. Post markdown-editor-migration
- * (ADR-001): swaps RichTextEditor -> MarkdownEditor and threads
- * highlighted_spans as sidecar state. Everything else this modal did
- * before the migration — labels, pin/archive/color toggles, Generate
- * Flashcards — is preserved.
- */
 import { useState } from "react";
 import type { Label, Note } from "../../types";
 import GenerateFlashcardsButton from "./GenerateFlashcardsButton";

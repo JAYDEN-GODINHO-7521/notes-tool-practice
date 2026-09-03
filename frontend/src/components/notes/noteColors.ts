@@ -1,5 +1,3 @@
-/** Named note colors (Keep-style color picker). Keys are stored in
- * Note.color; values are the Tailwind background classes for the card. */
 export const NOTE_COLORS: Record<string, { label: string; bg: string; swatch: string }> = {
   default: { label: "Default", bg: "bg-white", swatch: "bg-white border border-line" },
   sage: { label: "Sage", bg: "bg-[#DCEEE1]", swatch: "bg-[#DCEEE1]" },
