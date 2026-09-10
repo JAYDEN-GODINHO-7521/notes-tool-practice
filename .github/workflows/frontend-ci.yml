@@ -2,11 +2,11 @@ name: Frontend CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, milkdown-editor]
     paths:
       - 'frontend/**'
   pull_request:
-    branches: [main]
+    branches: [main, milkdown-editor]
     paths:
       - 'frontend/**'
 
