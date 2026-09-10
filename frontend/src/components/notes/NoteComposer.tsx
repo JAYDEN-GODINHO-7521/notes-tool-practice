@@ -1,7 +1,10 @@
+/** Composer for creating a new note, now using MilkdownNoteEditor (WYSIWYG)
+ * instead of the plain-textarea MarkdownEditor. Same content/highlighted-
+ * spans contract as before. */
 import { useState } from "react";
 import type { Label } from "../../types";
 import LabelPicker from "./LabelPicker";
-import MarkdownEditor from "./MarkdownEditor";
+import MilkdownNoteEditor from "./MilkdownNoteEditor";
 import { NOTE_COLOR_KEYS, NOTE_COLORS } from "./noteColors";
 
 interface NoteComposerProps {
@@ -18,6 +21,7 @@ interface NoteComposerProps {
 
 export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: NoteComposerProps) {
   const [expanded, setExpanded] = useState(false);
+  const [composerKey, setComposerKey] = useState(0); // forces MilkdownNoteEditor remount on reset
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [highlightedSpans, setHighlightedSpans] = useState<string[]>([]);
@@ -36,6 +40,7 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
     setColor("default");
     setLabelIds([]);
     setExpanded(false);
+    setComposerKey((k) => k + 1);
   }
 
   async function handleClose() {
@@ -79,7 +84,8 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
         placeholder="Title"
         className="w-full bg-transparent font-display text-lg text-ink placeholder:text-ink/40 focus:outline-none mb-2"
       />
-      <MarkdownEditor
+      <MilkdownNoteEditor
+        key={composerKey}
         content={content}
         onChange={setContent}
         highlightedSpans={highlightedSpans}
@@ -101,12 +107,7 @@ export default function NoteComposer({ allLabels, onLabelCreated, onCreate }: No
               />
             ))}
           </div>
-          <LabelPicker
-            allLabels={allLabels}
-            selectedLabelIds={labelIds}
-            onChange={setLabelIds}
-            onLabelCreated={onLabelCreated}
-          />
+          <LabelPicker allLabels={allLabels} selectedLabelIds={labelIds} onChange={setLabelIds} onLabelCreated={onLabelCreated} />
         </div>
         <button
           type="button"

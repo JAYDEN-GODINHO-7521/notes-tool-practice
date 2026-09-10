@@ -44,3 +44,22 @@ body {
 .dragging-note {
   opacity: 0.4;
 }
+
+.flashcard-mark {
+  background-color: theme('colors.gold.light');
+  border-radius: 2px;
+}
+
+.milkdown-note-editor .milkdown {
+  font-family: theme('fontFamily.sans');
+}
+.milkdown-note-editor .milkdown h1,
+.milkdown-note-editor .milkdown h2,
+.milkdown-note-editor .milkdown h3 {
+  font-family: theme('fontFamily.display');
+  color: theme('colors.ink');
+}
+.milkdown-note-editor .milkdown p,
+.milkdown-note-editor .milkdown li {
+  color: theme('colors.ink');
+}

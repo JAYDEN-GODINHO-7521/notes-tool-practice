@@ -10,11 +10,26 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@milkdown/core": "^7.22.1",
+    "@milkdown/plugin-history": "^7.22.1",
+    "@milkdown/plugin-listener": "^7.22.1",
+    "@milkdown/plugin-math": "^7.5.9",
+    "@milkdown/plugin-tooltip": "^7.22.1",
+    "@milkdown/preset-commonmark": "^7.22.1",
+    "@milkdown/preset-gfm": "^7.22.1",
+    "@milkdown/prose": "^7.22.1",
+    "@milkdown/react": "^7.22.1",
+    "@milkdown/theme-nord": "^7.22.1",
+    "@milkdown/utils": "^7.22.1",
     "axios": "^1.7.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.3",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "streamdown": "^2.6.0",
+    "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

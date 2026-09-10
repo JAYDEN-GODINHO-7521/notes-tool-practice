@@ -1,6 +1,24 @@
+/**
+ * Note card (grid + list variants). Verified against the real
+ * frontend/src/components/notes/NoteCard.tsx and its caller
+ * (NotesGrid.tsx) from the JAYDEN-GODINHO-7521/notes-tool-practice repo
+ * — prop names/shapes below now match that contract exactly (onOpen,
+ * onTogglePin(note), onToggleArchive(note), onDelete(note), listView
+ * boolean, isDragging/isDragOver/onDragEnd for the drag-reorder styling).
+ * An earlier version of this file (shipped in keep-migration.zip and
+ * keep-mdxeditor.zip) invented a different, incompatible prop shape —
+ * this replaces it.
+ *
+ * Only the content-rendering internals changed from the original TipTap
+ * version: `generateHTML(note.content, [...])` -> Streamdown, with
+ * highlighted_spans painted via the rehypeHighlightSpans plugin.
+ */
 import { useMemo } from "react";
+import { Streamdown } from "streamdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import type { Note } from "../../types";
-import { renderMarkdownPreview } from "../../lib/markdown";
+import rehypeHighlightSpans from "../../lib/rehypeHighlightSpans";
 import { NOTE_COLORS } from "./noteColors";
 
 interface NoteCardProps {
@@ -36,9 +54,9 @@ export default function NoteCard({
 }: NoteCardProps) {
   const color = NOTE_COLORS[note.color] ?? NOTE_COLORS.default;
 
-  const html = useMemo(
-    () => renderMarkdownPreview(note.content, note.highlighted_spans),
-    [note.content, note.highlighted_spans]
+  const rehypePlugins = useMemo(
+    () => [[rehypeHighlightSpans, { spans: note.highlighted_spans }] as const],
+    [note.highlighted_spans]
   );
 
   const dragProps = draggable
@@ -56,6 +74,12 @@ export default function NoteCard({
         onDragEnd,
       }
     : {};
+
+  const content = (
+    <Streamdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={rehypePlugins}>
+      {note.content}
+    </Streamdown>
+  );
 
   const labelChips = note.labels.length > 0 && (
     <div className="flex flex-wrap gap-1 mt-2">
@@ -83,10 +107,7 @@ export default function NoteCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             {note.title && <h3 className="font-display text-sm text-ink truncate">{note.title}</h3>}
-            <div
-              className="prose prose-sm max-w-none font-sans text-ink/70 truncate [&_*]:inline"
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+            <div className="prose prose-sm max-w-none font-sans text-ink/70 truncate [&_*]:inline">{content}</div>
           </div>
           {note.labels.length > 0 && (
             <div className="flex gap-1 mt-1">
@@ -138,14 +159,9 @@ export default function NoteCard({
         </span>
       )}
 
-      {note.title && (
-        <h3 className="font-display text-lg text-ink mb-1 truncate">{note.title}</h3>
-      )}
+      {note.title && <h3 className="font-display text-lg text-ink mb-1 truncate">{note.title}</h3>}
 
-      <div
-        className="prose prose-sm max-w-none font-sans text-ink/90 line-clamp-6"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className="prose prose-sm max-w-none font-sans text-ink/90 line-clamp-6">{content}</div>
 
       {labelChips}
 
