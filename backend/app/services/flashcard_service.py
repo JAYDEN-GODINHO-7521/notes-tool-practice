@@ -18,9 +18,12 @@ def extract_note_text(note: Note) -> str:
 
 
 def extract_highlighted_spans(note: Note) -> list[str]:
-    import re
-
-    return re.findall(r"==(.+?)==", note.content or "")
+    """Highlighting is stored as sidecar metadata (Note.highlighted_spans),
+    not inline markup in content — see ADR-001. routers/notes.py already
+    cleans stale spans on save, but re-filter here too as a defensive
+    second check (same pattern already used elsewhere in this file for
+    the LLM-response parsing)."""
+    return [s for s in (note.highlighted_spans or []) if s and s in (note.content or "")]
 
 
 def _parse_cards(raw: str) -> list[dict]:

@@ -29,9 +29,8 @@ export default function NotesGrid({
 
   if (notes.length === 0) {
     return (
-      <div className="text-center py-24 text-ink/40 font-sans">
-        <p className="font-display text-xl text-ink/60 mb-1">Nothing here yet</p>
-        <p className="text-sm">Notes you create will show up here.</p>
+      <div className="text-center py-16 text-ink/40 font-sans">
+        <p className="text-sm">No other notes here yet.</p>
       </div>
     );
   }

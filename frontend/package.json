@@ -10,6 +10,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@milkdown/exception": "^7.22.1",
     "@milkdown/core": "^7.22.1",
     "@milkdown/plugin-history": "^7.22.1",
     "@milkdown/plugin-listener": "^7.22.1",
@@ -19,7 +20,6 @@
     "@milkdown/preset-gfm": "^7.22.1",
     "@milkdown/prose": "^7.22.1",
     "@milkdown/react": "^7.22.1",
-    "@milkdown/theme-nord": "^7.22.1",
     "@milkdown/utils": "^7.22.1",
     "axios": "^1.7.7",
     "react": "^18.3.1",
@@ -30,6 +30,12 @@
     "remark-math": "^6.0.0",
     "streamdown": "^2.6.0",
     "unist-util-visit": "^5.1.0"
+  },
+  "overrides": {
+    "@milkdown/plugin-math": {
+      "@milkdown/exception": "$@milkdown/exception",
+      "@milkdown/utils": "$@milkdown/utils"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -3,32 +3,34 @@
  * request / Mark for flashcards. Built as a plain ProseMirror Plugin
  * (via @milkdown/utils's $prose), using @milkdown/plugin-tooltip's
  * TooltipProvider directly for floating positioning (tippy.js under the
- * hood) — more robust than the manual getBoundingClientRect() approach
- * used for the earlier MDXEditor/Lexical version.
+ * hood).
  *
- * CORRECTED: an earlier version of this file tried to bind the tooltip
- * via $view(tooltipFactory(...), ...) — that's wrong. $view() is for
- * binding a NodeView/MarkView to a schema node/mark defined with
- * $node/$mark; a floating selection tooltip isn't a node or mark, it's
- * selection-driven UI, which is exactly what a plain ProseMirror Plugin's
- * own `view` lifecycle hook is for. This version uses $prose() (Milkdown's
- * wrapper for "just register a ProseMirror Plugin") + that plugin's
- * `view(editorView)` hook to mount TooltipProvider — the same pattern
- * flashcardHighlightPlugin.ts already uses for its own Plugin.
+ * FIXED (two bugs):
+ * (#1) toggleHighlight now reads/writes stateRef.current.highlightedSpans
+ * at call-time instead of a value captured once at plugin construction —
+ * previously, marking a second highlighted span could silently drop the
+ * first one, since the write was based on a frozen, out-of-date array.
+ * (#2) SelectionMenuContent now gets a fresh `key` per selection, forcing
+ * React to fully unmount/remount it (resetting mode/preview/instruction)
+ * whenever the selection changes, and its in-flight AI request is
+ * actually cancelled via AbortController + streamGenerate's `signal`
+ * option. Previously the same component instance was reused across
+ * selections, so switching selection mid-request could result in the
+ * old selection's generated text getting inserted into the new one.
  *
- * The AI streaming preview renders via Streamdown (not a separate
- * streaming-markdown parser) per the decision to consolidate on one
- * markdown renderer across the app.
+ * The AI streaming preview renders via Streamdown per the decision to
+ * consolidate on one markdown renderer across the app.
  */
 import { $prose } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import type { EditorState } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 import { TooltipProvider } from "@milkdown/plugin-tooltip";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Streamdown } from "streamdown";
 import { streamGenerate, type AiAction } from "../../api/ai";
+import type { HighlightStateRef } from "../../lib/flashcardHighlightPlugin";
 
 interface MenuAPI {
   getSelectedText: () => string;
@@ -37,7 +39,6 @@ interface MenuAPI {
   toggleHighlight: (text: string) => void;
 }
 
-/** React component mounted into the tooltip's DOM container via createRoot. */
 function SelectionMenuContent({ api, onClose }: { api: MenuAPI; onClose: () => void }) {
   type Mode = "menu" | "custom-input" | "loading" | "preview";
   const [mode, setMode] = useState<Mode>("menu");
@@ -45,8 +46,19 @@ function SelectionMenuContent({ api, onClose }: { api: MenuAPI; onClose: () => v
   const [preview, setPreview] = useState("");
   const [error, setError] = useState<string | null>(null);
   const text = api.getSelectedText();
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   async function runGenerate(action: AiAction, customInstruction?: string) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setMode("loading");
     setPreview("");
     setError(null);
@@ -56,9 +68,11 @@ function SelectionMenuContent({ api, onClose }: { api: MenuAPI; onClose: () => v
         text,
         instruction: customInstruction,
         onDelta: (delta) => setPreview((p) => p + delta),
+        signal: controller.signal,
       });
-      setMode("preview");
+      if (!controller.signal.aborted) setMode("preview");
     } catch {
+      if (controller.signal.aborted) return; // superseded by a newer selection — ignore
       setError("Something went wrong. Try again.");
       setMode("menu");
     }
@@ -132,21 +146,19 @@ function SelectionMenuContent({ api, onClose }: { api: MenuAPI; onClose: () => v
   );
 }
 
-interface FlashcardTooltipOptions {
-  highlightedSpans: string[];
-  onHighlightedSpansChange: (spans: string[]) => void;
-}
-
 const flashcardTooltipKey = new PluginKey("flashcardTooltip");
 
 /**
- * Registered in MilkdownNoteEditor.tsx via `.use(flashcardTooltipPlugin({...}))`.
- * Do NOT also `.use(tooltip)` (the base @milkdown/plugin-tooltip plugin) —
- * that was only needed to pair with the old, incorrect $view(tooltipFactory)
- * approach and should be removed from MilkdownNoteEditor.tsx's plugin list.
+ * Registered via `.use(flashcardTooltipPlugin(stateRef))`. Takes the
+ * shared HighlightStateRef so every toggle reads/writes the latest
+ * highlighted_spans, not a value frozen at plugin-construction time.
+ *
+ * Do NOT also `.use(tooltip)` (the base @milkdown/plugin-tooltip plugin).
  */
-export function flashcardTooltipPlugin({ highlightedSpans, onHighlightedSpansChange }: FlashcardTooltipOptions) {
+export function flashcardTooltipPlugin(stateRef: HighlightStateRef) {
   return $prose(() => {
+    let selectionToken = 0;
+
     return new Plugin({
       key: flashcardTooltipKey,
       view(editorView: EditorView) {
@@ -163,14 +175,17 @@ export function flashcardTooltipPlugin({ highlightedSpans, onHighlightedSpansCha
 
         function render(view: EditorView) {
           const { from, to } = view.state.selection;
+          selectionToken += 1;
+          const tokenAtRender = selectionToken;
 
           const api: MenuAPI = {
             getSelectedText: () => view.state.doc.textBetween(from, to, " "),
             replaceSelection: (text: string) => {
               view.dispatch(view.state.tr.insertText(text, from, to));
             },
-            isHighlighted: (text: string) => highlightedSpans.includes(text),
+            isHighlighted: (text: string) => stateRef.current.highlightedSpans.includes(text),
             toggleHighlight: (text: string) => {
+              const { highlightedSpans, onHighlightedSpansChange } = stateRef.current;
               const already = highlightedSpans.includes(text);
               onHighlightedSpansChange(
                 already ? highlightedSpans.filter((s) => s !== text) : [...highlightedSpans, text]
@@ -179,14 +194,11 @@ export function flashcardTooltipPlugin({ highlightedSpans, onHighlightedSpansCha
           };
 
           if (!root) root = createRoot(content);
-          root.render(<SelectionMenuContent api={api} onClose={() => provider.hide()} />);
+          // key={tokenAtRender}: full remount per selection — resets local
+          // state and aborts any in-flight request for the old selection.
+          root.render(<SelectionMenuContent key={tokenAtRender} api={api} onClose={() => provider.hide()} />);
         }
 
-        // Render once with the initial view — the `view()` lifecycle hook
-        // only runs at mount, and ProseMirror doesn't call `update()`
-        // until after the first transaction, so without this the
-        // tooltip's React content would be empty until something changes
-        // the selection.
         render(editorView);
 
         return {

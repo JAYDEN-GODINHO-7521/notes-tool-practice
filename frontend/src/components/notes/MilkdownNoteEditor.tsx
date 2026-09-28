@@ -1,46 +1,35 @@
 /**
  * WYSIWYG markdown editor for notes, built on Milkdown (ProseMirror).
- * Replaces the earlier MDXEditor/Lexical attempt — see conversation
- * history for the reasoning (ProseMirror Decorations are a purpose-built
- * fit for highlighted_spans; ProseMirror/Milkdown's core plugin API is
- * more stable than Lexical's/MDXEditor's).
  *
- * Content contract unchanged throughout this whole migration: `content`
- * in (markdown string), `onChange` fires with the updated markdown
- * string via the listener plugin. Milkdown is uncontrolled after mount —
- * switching notes should remount this component via `key={note.id}` at
- * the call site (same pattern already used for NoteEditModal).
- *
- * v1 known gap: Mermaid diagrams render correctly in the read-only
- * NoteCard view (Streamdown) but only as a plain fenced code block while
- * editing — no maintained Milkdown Mermaid plugin as of this writing.
- * Math (KaTeX) DOES have first-party support here via @milkdown/plugin-math,
- * unlike the MDXEditor attempt.
- *
- * Does NOT register the base @milkdown/plugin-tooltip `tooltip` plugin —
- * flashcardTooltipPlugin (see MilkdownSelectionMenu.tsx) is a self-
- * contained ProseMirror Plugin built via $prose() that uses
- * TooltipProvider directly, so it doesn't need the base plugin
- * registered separately. (An earlier version of this file did register
- * it, to pair with a since-corrected $view(tooltipFactory) approach.)
- *
- * No theme package (e.g. @milkdown/theme-nord) is used — that package's
- * CSS is written for Tailwind v4's native @layer support and breaks the
- * PostCSS build under Tailwind v3 (`@layer base` used without a
- * matching `@tailwind base` in the same file). It's also Milkdown's
- * generic default look, not this app's actual palette — style
- * `.milkdown-note-editor` directly in index.css instead, matching the
- * paper/ink/moss/gold palette used everywhere else.
+ * FIXES applied:
+ * - flashcardHighlightPlugin/flashcardTooltipPlugin now both read from a
+ *   single shared stateRef, kept current every render, instead of being
+ *   constructed once with frozen prop values.
+ * - Exposes onReadyChange so consumers (EditorToolbar) can disable
+ *   formatting buttons until the async editor instance actually exists,
+ *   instead of clicks silently no-op'ing before it's ready.
  */
-import { useEffect } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
-import { commonmark } from "@milkdown/preset-commonmark";
+import {
+  commonmark,
+  toggleStrongCommand,
+  toggleEmphasisCommand,
+  wrapInHeadingCommand,
+  wrapInBulletListCommand,
+  wrapInOrderedListCommand,
+} from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { history } from "@milkdown/plugin-history";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { math } from "@milkdown/plugin-math";
+import { callCommand } from "@milkdown/utils";
 import { Milkdown, useEditor, MilkdownProvider } from "@milkdown/react";
-import { flashcardHighlightPlugin, flashcardHighlightKey } from "../../lib/flashcardHighlightPlugin";
+import {
+  flashcardHighlightPlugin,
+  flashcardHighlightKey,
+  type HighlightStateRefValue,
+} from "../../lib/flashcardHighlightPlugin";
 import { flashcardTooltipPlugin } from "./MilkdownSelectionMenu";
 
 interface MilkdownNoteEditorProps {
@@ -49,6 +38,19 @@ interface MilkdownNoteEditorProps {
   highlightedSpans: string[];
   onHighlightedSpansChange: (spans: string[]) => void;
   autoFocus?: boolean;
+  onReadyChange?: (ready: boolean) => void;
+}
+
+export interface MilkdownEditorHandle {
+  toggleBold: () => void;
+  toggleItalic: () => void;
+  setHeading: (level: number) => void;
+  toggleBulletList: () => void;
+  toggleOrderedList: () => void;
+}
+
+interface EditorInnerProps extends MilkdownNoteEditorProps {
+  handleRef: React.Ref<MilkdownEditorHandle>;
 }
 
 function EditorInner({
@@ -57,7 +59,17 @@ function EditorInner({
   highlightedSpans,
   onHighlightedSpansChange,
   autoFocus,
-}: MilkdownNoteEditorProps) {
+  onReadyChange,
+  handleRef,
+}: EditorInnerProps) {
+  // "Latest ref" pattern — kept current every render (no dep array), so
+  // both plugins below always read today's props even though they were
+  // constructed once, at mount, via useEditor's factory.
+  const stateRef = useRef<HighlightStateRefValue>({ highlightedSpans, onHighlightedSpansChange });
+  useEffect(() => {
+    stateRef.current = { highlightedSpans, onHighlightedSpansChange };
+  });
+
   const { get } = useEditor((root) =>
     Editor.make()
       .config((ctx) => {
@@ -73,13 +85,51 @@ function EditorInner({
       .use(history)
       .use(listener)
       .use(math)
-      .use(flashcardHighlightPlugin)
-      .use(flashcardTooltipPlugin({ highlightedSpans, onHighlightedSpansChange }))
+      .use(flashcardHighlightPlugin(stateRef))
+      .use(flashcardTooltipPlugin(stateRef))
   );
 
-  // Push updated highlighted_spans into the ProseMirror plugin via
-  // transaction meta whenever the prop changes — see
-  // flashcardHighlightPlugin.ts for why this is the sync mechanism.
+  useImperativeHandle(
+    handleRef,
+    () => ({
+      toggleBold: () => get()?.action(callCommand(toggleStrongCommand.key)),
+      toggleItalic: () => get()?.action(callCommand(toggleEmphasisCommand.key)),
+      setHeading: (level: number) => get()?.action(callCommand(wrapInHeadingCommand.key, level)),
+      toggleBulletList: () => get()?.action(callCommand(wrapInBulletListCommand.key)),
+      toggleOrderedList: () => get()?.action(callCommand(wrapInOrderedListCommand.key)),
+    }),
+    [get]
+  );
+
+  // Poll via requestAnimationFrame (rather than assume an undocumented
+  // internal "loading" field on useEditor's return value) until the
+  // async editor instance exists, then notify the consumer.
+  useEffect(() => {
+    let cancelled = false;
+    let rafId = 0;
+    function check() {
+      if (cancelled) return;
+      if (get()) {
+        onReadyChange?.(true);
+      } else {
+        rafId = requestAnimationFrame(check);
+      }
+    }
+    check();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+      onReadyChange?.(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [get]);
+
+  // Best-effort follow-up sync for highlighted_spans changes that don't
+  // originate from the user's own in-editor toggle (e.g. a programmatic
+  // reset). The *initial* render no longer depends on this — see
+  // flashcardHighlightPlugin.ts's state.init — so a missed/early call
+  // here is no longer data-loss, just a slightly stale decoration until
+  // the next real change.
   useEffect(() => {
     const editor = get();
     if (!editor) return;
@@ -93,12 +143,16 @@ function EditorInner({
   return <Milkdown />;
 }
 
-export default function MilkdownNoteEditor(props: MilkdownNoteEditorProps) {
-  return (
-    <MilkdownProvider>
-      <div className="milkdown-note-editor text-sm text-ink">
-        <EditorInner {...props} />
-      </div>
-    </MilkdownProvider>
-  );
-}
+const MilkdownNoteEditor = forwardRef<MilkdownEditorHandle, MilkdownNoteEditorProps>(
+  function MilkdownNoteEditor(props, ref) {
+    return (
+      <MilkdownProvider>
+        <div className="milkdown-note-editor text-sm text-ink">
+          <EditorInner {...props} handleRef={ref} />
+        </div>
+      </MilkdownProvider>
+    );
+  }
+);
+
+export default MilkdownNoteEditor;

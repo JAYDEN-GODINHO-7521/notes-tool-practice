@@ -3,6 +3,7 @@ import ProtectedRoute from "./components/layout/ProtectedRoute";
 import { AuthProvider } from "./hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import NoteWindow from "./pages/NoteWindow";
 import Register from "./pages/Register";
 import StudyHub from "./pages/StudyHub";
 
@@ -17,6 +18,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/study" element={<StudyHub />} />
+            <Route path="/notes/:noteId" element={<NoteWindow />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
