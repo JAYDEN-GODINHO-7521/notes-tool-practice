@@ -2,7 +2,6 @@ import { $prose } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/prose/view";
 import type { Node as ProseMirrorNode } from "@milkdown/prose/model";
-import type { RefObject } from "react";
 
 export const flashcardHighlightKey = new PluginKey<DecorationSet>("flashcardHighlight");
 
@@ -17,7 +16,11 @@ export interface HighlightStateRefValue {
   highlightedSpans: string[];
   onHighlightedSpansChange: (spans: string[]) => void;
 }
-export type HighlightStateRef = RefObject<HighlightStateRefValue>;
+// Plain `{ current: T }` (not React's RefObject<T>, whose `current` is
+// typed `T | null`). This ref is always initialized with a real value
+// by useRef<HighlightStateRefValue>(...) in MilkdownNoteEditor.tsx, so
+// `current` is never null.
+export type HighlightStateRef = { current: HighlightStateRefValue };
 
 function buildDecorations(doc: ProseMirrorNode, spans: string[]): DecorationSet {
   if (!spans || spans.length === 0) return DecorationSet.empty;
@@ -67,7 +70,7 @@ export function flashcardHighlightPlugin(stateRef: HighlightStateRef) {
       key: flashcardHighlightKey,
       state: {
         init: (_config, editorState) =>
-          buildDecorations(editorState.doc, stateRef.current?.highlightedSpans ?? []),
+          buildDecorations(editorState.doc, stateRef.current.highlightedSpans),
         apply(tr, old) {
           const spans = tr.getMeta(flashcardHighlightKey) as string[] | undefined;
           if (spans !== undefined) {
@@ -87,12 +90,3 @@ export function flashcardHighlightPlugin(stateRef: HighlightStateRef) {
     });
   });
 }
-
-/**
- * Global CSS needed once (index.css):
- *
- *   .flashcard-mark {
- *     background-color: theme('colors.gold-light');
- *     border-radius: 2px;
- *   }
- */
